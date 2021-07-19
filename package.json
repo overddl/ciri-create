@@ -1,0 +1,16 @@
+{
+  "name": "ciri-create",
+  "version": "1.0.1",
+  "description": "a create app cli",
+  "main": "index.js",
+  "author": "",
+  "license": "ISC",
+  "bin": {
+    "ciri-create": "index.js"
+  },
+  "dependencies": {
+    "chalk": "^4.1.1",
+    "commander": "^4.1.1",
+    "validate-npm-package-name": "^3.0.0"
+  }
+}
