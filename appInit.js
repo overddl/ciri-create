@@ -14,12 +14,13 @@ const commander = require('commander');
 const chalk = require('chalk');
 const path = require('path');
 const fs = require('fs');
-const os = require('os');
+const fsPromises = require('fs/promises');
 const validateProjectName = require('validate-npm-package-name');
 
 const { execSync, spawnSync } = require('child_process');
 
 const packageJson = require('./package.json');
+
 let projectName = '';
 
 function appInit() {
@@ -69,8 +70,18 @@ function appCreate(name, templateName, useYarn) {
 
 function run(projectRoot, appName, templateName, useYarn) {
   // 寻找 模版 完成 copy
-  console.log(Array.prototype.slice.call(arguments));
-  // 根据指定包工具 完成 安装
+  const templatePath = path.join(path.resolve(__dirname),'ciri-template', templateName);
+  console.log(chalk.green('Template: admin-react-app Downloading...\n'));
+
+  copyDirectory(templatePath, projectRoot)
+    .then(() => {
+      console.log(chalk.green('\nTemplate Download Successful!\n'));
+      // 根据指定包工具 完成 安装
+      // packageInstall();
+    }, (err) => {
+      logError(`\nTemplate Download failed!\n${err}`);
+      process.exit(1);
+    })
 }
 
 function checkNodeVersion() {
@@ -132,7 +143,7 @@ function checkSafeToCreateProject(projectRoot, appName) {
     .filter(file => !isErrorLog(file));
 
   if(conflicts.length > 0) {
-    console.log(`The directory ${chalk.green(appName)} contains files that could conflict: \n`);
+    logWarn(`The directory ${chalk.green(appName)} contains files that could conflict: \n`);
     for (const file of conflicts) {
       try {
         const stats = fs.lstatSync(path.join(projectRoot, file));
@@ -145,7 +156,7 @@ function checkSafeToCreateProject(projectRoot, appName) {
         console.log(`  ${file}`);
       }
     }
-    return;
+    process.exit(1);
   }
 
   // remove 
@@ -192,6 +203,36 @@ function checkTemplate(templateName) {
     console.log(`Please select one of them: ${templates.join(',')}\n`);
     process.exit(1);
   }
+}
+
+function copyDirectory(src, tgt) {
+  const mkdirPromise = new Promise((resolve) => {
+    const isTgtExists = fs.existsSync(tgt);
+    if(!isTgtExists) {
+      fsPromises.mkdir(tgt).then(resolve)
+    }else {
+      resolve();
+    }
+  })
+
+  return mkdirPromise
+    .then(() => fsPromises.readdir(src))
+    .then(files => {
+      return files.reduce((prev, file) => {
+        return prev.then(() => {
+          const target = path.join(tgt, file);
+          const source = path.join(src, file);
+          return fsPromises.lstat(source).then((stat) => {
+            if(stat.isDirectory()) {
+              return copyDirectory(source, target);
+            }else {
+              console.log(chalk.yellow(`  Generating files: ${target}`));
+              fs.createReadStream(source).pipe(fs.createWriteStream(target))  
+            }
+          })
+        })
+      }, Promise.resolve());
+    })
 }
 
 function logError(err) {
