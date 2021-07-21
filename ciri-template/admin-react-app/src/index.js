@@ -1,5 +1,3 @@
 import { render } from 'react-dom';
 
-import Root from './containers/root';
-
-render(<Root />, document.getElementById('root'));
+render(<h1>this react template.</h1>, document.getElementById('root'));

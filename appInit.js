@@ -1,5 +1,5 @@
 // ciri-create my-app 创建 my-app 项目
-// 设定参数，--use-npm --use-yarn --template 选择项目配置模版 安装方式 安装哪种模版
+// 设定参数，--use-yarn --template 选择项目配置模版 安装方式 安装哪种模版
 // 1. 校验my-app 名称合法性，
 // 2. 判断安装方式，测试源，网络链接性
 // 3. 判断模版是否可用，
@@ -17,7 +17,7 @@ const fs = require('fs');
 const fsPromises = require('fs/promises');
 const validateProjectName = require('validate-npm-package-name');
 
-const { execSync, spawnSync } = require('child_process');
+const { execSync, spawn } = require('child_process');
 
 const packageJson = require('./package.json');
 
@@ -33,7 +33,7 @@ function appInit() {
       projectName = name
     })
     .option('--use-yarn', 'User npm to install.')
-    .option('--template <template-name>', 'Project Template for the created.', 'admin-react-app')
+    .option('--template <template-name>', 'Project Template for the created.', 'pure-react-app')
     .parse(process.argv);
 
   if(projectName === '') {
@@ -77,9 +77,16 @@ function run(projectRoot, appName, templateName, useYarn) {
     .then(() => {
       console.log(chalk.green('\nTemplate Download Successful!\n'));
       // 根据指定包工具 完成 安装
-      // packageInstall();
-    }, (err) => {
-      logError(`\nTemplate Download failed!\n${err}`);
+      process.chdir(projectRoot);
+      console.log(chalk.green('Package Installing...  \n'))
+      return packageInstall(useYarn);
+    })
+    .then(() => {
+      console.log(chalk.green('Package Install Successful\n'));
+      // ciri-script 执行构建
+    })
+    .catch((err) => {
+      logError(`\nTemplate Install failed!\n${err}`);
       process.exit(1);
     })
 }
@@ -169,13 +176,13 @@ function checkSafeToCreateProject(projectRoot, appName) {
 }
 
 function checkNpmVersion() {
-  let npmVersion = '';
+  let npmVersion = '', major = 0;
   try {
     npmVersion = execSync('npm --version').toString().trim();
+    major = npmVersion.split('.')[0];
   } catch (err) { 
-
+    throw err;
   }
-  const major = npmVersion.split('.')[0];
   if(major < 6) {
     logError(`Curren Npm Version is ${npmVersion}.\nPlease update your version of npm to 6 or higher`);
     process.exit(1);
@@ -183,14 +190,15 @@ function checkNpmVersion() {
 }
 
 function checkYarnRegistry() {
-  let yarnUsesDefaultRegistry = 'https://registry.yarnpkg.com';
-  let isDefaultRegistry = true;
+  let yarnVersion = '', major;
   try {
-    isDefaultRegistry = execSync('yarnpkg config get registry').toString().trim() === yarnUsesDefaultRegistry;
-  } catch(err) {
-
+    yarnVersion = execSync('yarn --version').toString().trim();
+    major = npmVersion.split('.')[0];
+  } catch (err) {
+    throw err;
   }
-  if(!isDefaultRegistry) {
+  if(major > 1) {
+    logError(`Curren Yarn Version is ${yarnVersion}.\nSuport 1.x`);
     process.exit(1);
   }
 }
@@ -233,6 +241,29 @@ function copyDirectory(src, tgt) {
         })
       }, Promise.resolve());
     })
+}
+
+function packageInstall(useYarn) {
+  return new Promise((resolve) => {
+    let command, args;
+    if(useYarn) {
+      command = 'yarn';
+      args = ['install']
+    }else {
+      command = 'npm';
+      args = ['install']
+    }
+    const child = spawn(command, args, { stdio: 'inherit' });
+    child.on('close', code => {
+      if (code !== 0) {
+        reject({
+          command: `${command} ${args.join(' ')}`,
+        });
+        return;
+      }
+      resolve();
+    });
+  })
 }
 
 function logError(err) {
